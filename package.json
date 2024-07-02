@@ -18,6 +18,7 @@
     "@fastify/cors": "^9.0.1",
     "@prisma/client": "^5.16.1",
     "fastify": "^4.28.1",
+    "puppeteer": "^22.12.1",
     "tsx": "^4.16.0"
   }
 }
