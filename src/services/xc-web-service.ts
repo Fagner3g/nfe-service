@@ -165,10 +165,6 @@ class XcWebService {
   }
 
   async execute({ password, username }: SignIn) {
-    if (!password || !username) {
-      throw new Error('Preecha todos os campos');
-    }
-
     return await this.signIn({ password, username });
   }
 }
