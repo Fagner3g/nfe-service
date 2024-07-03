@@ -1,6 +1,6 @@
 import { Page } from 'puppeteer';
 import userDao, { UserLogged } from '../dao/user-dao';
-import logService from './log-server';
+import logService from './log-service';
 
 export class XcApiService {
   private loginUrl = 'http://xcbrasil.com.br/index.php?name=leonardo&op=login';
@@ -41,7 +41,7 @@ export class XcApiService {
     await this.page.close();
   }
 
-  async getInstance({ username, password }: { username: string; password: string }): Promise<{ id: string }> {
+  async signIn({ username, password }: { username: string; password: string }): Promise<{ id: string }> {
     // Acessa a url
     await this.page.goto(this.loginUrl, { waitUntil: 'networkidle2' });
 
@@ -59,29 +59,6 @@ export class XcApiService {
     const isLogged = await this.listenSignIn();
     if (!isLogged) {
       throw new Error('Usuário ou senha inválidos');
-    }
-
-    const emailRegex = /\S+@\S+\.\S+/;
-    const numberRegex = /^\d+$/;
-
-    const payload: UserLogged = {
-      id: this.id,
-      password,
-    };
-
-    if (emailRegex.test(username)) {
-      payload.email = username;
-    } else if (numberRegex.test(username)) {
-      payload.civilId = username;
-    } else {
-      throw new Error('Nenhum tipo de dado valido');
-    }
-
-    try {
-      await userDao.siginIn(payload);
-    } catch (error) {
-      logService.error(error);
-      throw new Error('Erro ao salvar usuário');
     }
 
     return { id: this.id };
