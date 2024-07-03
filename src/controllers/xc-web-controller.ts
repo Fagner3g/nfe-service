@@ -1,25 +1,33 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
-import { xcApiService } from '../services/xc-api-service';
+import { XcApiService } from '../services/xc-api-service';
 import { xcUserService } from '../services/xc-user-service';
 import { xcParagliderService } from '../services/xc-paraglider-service';
+import { Page } from 'puppeteer';
 
 class XcWebController {
+  private page: Page;
+
+  constructor(page: Page) {
+    this.page = page;
+  }
+
   async handle(request: FastifyRequest, reply: FastifyReply) {
     if (!request.body) {
       return reply.code(400).send({ msg: 'Preecha todos os campos' });
     }
+
     const { password, username } = request.body as { password: string; username: string };
     if (!password && !username) {
       return reply.code(400).send({ msg: 'Preecha todos os campos' });
     }
 
+    const xcApiService = new XcApiService(this.page);
+    const { id } = await xcApiService.getInstance({ password, username });
     try {
-      const { page, id } = await xcApiService.getInstance({ password, username });
-      const user = await xcUserService.getUserName(page);
-      const { glider, takeoff } = await xcParagliderService.getGliderAndTakeoff(page, id);
-      await new Promise((resolve) => setTimeout(resolve, 10000));
+      const user = await xcUserService.getUserName(this.page);
+      const { glider, takeoff } = await xcParagliderService.getGliderAndTakeoff(this.page, id);
       await xcApiService.closeInstance();
-      reply.send({ user, glider, takeoff });
+      reply.send({ id, user, glider, takeoff });
     } catch (e) {
       if (e instanceof Error) {
         xcApiService.closeInstance();

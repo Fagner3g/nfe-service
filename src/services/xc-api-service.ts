@@ -1,14 +1,20 @@
-import pup, { Page } from 'puppeteer';
+import { Page } from 'puppeteer';
 import userDao, { UserLogged } from '../dao/user-dao';
+import logService from './log-server';
 
-class XcApiService {
+export class XcApiService {
   private loginUrl = 'http://xcbrasil.com.br/index.php?name=leonardo&op=login';
   private id: string = '0';
-  private page: Page | undefined = undefined;
 
-  private async listenSignIn(page: Page): Promise<boolean> {
+  private page: Page;
+
+  constructor(page: Page) {
+    this.page = page;
+  }
+
+  private async listenSignIn(): Promise<boolean> {
     return new Promise((resolve) => {
-      page.on('response', (resp) => {
+      this.page.on('response', (resp) => {
         if (resp.url().includes('/pilot')) {
           const url = resp.url();
           const id = url.split('pilot/')[1];
@@ -23,11 +29,7 @@ class XcApiService {
   }
 
   private async signOut() {
-    if (this.page) {
-      await this.page?.goto('http://xcbrasil.com.br/index.php?name=leonardo&op=login&logout=true');
-    } else {
-      throw new Error('Nenhuma instância aberta');
-    }
+    await this.page.goto('http://xcbrasil.com.br/index.php?name=leonardo&op=login&logout=true');
   }
 
   getUserId() {
@@ -35,43 +37,26 @@ class XcApiService {
   }
 
   async closeInstance() {
-    if (this.page) {
-      await this.signOut();
-      // await this.page.close();
-    } else {
-      console.log('Nenhuma instância aberta');
-      throw new Error('Nenhuma instância aberta');
-    }
+    await this.signOut();
+    await this.page.close();
   }
 
-  async getInstance({
-    username,
-    password,
-  }: {
-    username: string;
-    password: string;
-  }): Promise<{ page: Page; id: string }> {
-    // Inicia o browser e headless false para ver o browser { headless: false }
-    const browser = await pup.launch({ headless: false });
-    // Cria uma nova página
-    const page = await browser.newPage();
-    this.page = page;
-
+  async getInstance({ username, password }: { username: string; password: string }): Promise<{ id: string }> {
     // Acessa a url
-    await page.goto(this.loginUrl);
+    await this.page.goto(this.loginUrl, { waitUntil: 'networkidle2' });
 
     // Aguarda o input de login
-    await page.waitForSelector('.logintext');
-    await page.type('.logintext', username);
+    await this.page.waitForSelector('.logintext');
+    await this.page.type('.logintext', username);
 
     // Aguarda o input de senha
-    await page.waitForSelector('.loginpassword');
-    await page.type('.loginpassword', password);
+    await this.page.waitForSelector('.loginpassword');
+    await this.page.type('.loginpassword', password);
 
     // Aguarda o botão de login
-    await page.locator('.submitButton').click();
+    await this.page.locator('.submitButton').click();
 
-    const isLogged = await this.listenSignIn(page);
+    const isLogged = await this.listenSignIn();
     if (!isLogged) {
       throw new Error('Usuário ou senha inválidos');
     }
@@ -95,12 +80,10 @@ class XcApiService {
     try {
       await userDao.siginIn(payload);
     } catch (error) {
-      console.log(error);
+      logService.error(error);
       throw new Error('Erro ao salvar usuário');
     }
 
-    return { page, id: this.id };
+    return { id: this.id };
   }
 }
-
-export const xcApiService = new XcApiService();
