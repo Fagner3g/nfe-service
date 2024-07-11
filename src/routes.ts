@@ -18,7 +18,6 @@ export default async function routes(app: FastifyInstance, opt: FastifyPluginOpt
         try {
           const xcWebService = new XcWebController(page);
           await xcWebService.handle(request, reply);
-          await new Promise((resolve) => setTimeout(resolve, 5000));
 
           console.log('📍 Close ProcessId: ', worker.id);
         } catch (error) {

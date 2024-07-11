@@ -29,18 +29,17 @@ class XcWebController {
         const user = await xcUserService.getUserName(this.page);
         const { glider, takeoff } = await xcParagliderService.getGliderAndTakeoff(this.page, id);
         await xcApiService.closeInstance();
-        reply.send({ id, user, glider, takeoff });
+        reply.send({ id, ...user, glider, takeoff });
       } catch (e) {
         if (e instanceof Error) {
           xcApiService.closeInstance();
-          if (e.message.includes('ERR_TIMED_OUT')) {
-            reply.code(408).send({ msg: 'Timeout' });
-          } else {
-            reply.code(400).send({ msg: e.message });
-          }
+          reply.code(400).send({ msg: e.message });
         }
       }
     } catch (error) {
+      if (error.message.includes('ERR_TIMED_OUT')) {
+        reply.code(408).send({ msg: 'Timeout' });
+      }
       reply.code(401).send({ msg: error.message });
     }
   }
