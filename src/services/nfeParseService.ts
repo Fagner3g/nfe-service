@@ -1,6 +1,7 @@
-import { Page } from 'puppeteer';
+import pup, { Page } from 'puppeteer';
+import logService from './log-service';
 
-class XcParagliderService {
+class NfeParseService {
   private async getTakeoff(page: Page, id: string) {
     await page.goto(
       `http://xcbrasil.com.br/stats/world/2024/brand:all,cat:0,class:all,xctype:all,club:all,pilot:0_${id},takeoff:all`
@@ -61,11 +62,54 @@ class XcParagliderService {
     });
   }
 
-  async getGliderAndTakeoff(page: Page, id: string) {
-    const takeoff = await this.getTakeoff(page, id);
-    const glider = await this.getGlider(page);
-    return { takeoff, glider };
+  async findBarcode(barcode: string) {
+    const browser = await pup.launch({ headless: false });
+
+    // Cria uma nova página
+    const page = await browser.newPage();
+
+    logService.error(JSON.stringify(barcode));
+    // Acessa a url
+    await page.goto(
+      `https://portalsped.fazenda.mg.gov.br/portalnfce/sistema/qrcode.xhtml?p=${barcode}%7C2%7C1%7C1%7C56a3d21a6102bea3f5ef4ae0b51550e0eec07a20`,
+      { waitUntil: 'networkidle2' }
+    );
+
+    // Extrai os dados da tabela
+    const items = await page.evaluate(() => {
+      const rows = Array.from(document.querySelectorAll('#myTable tr'));
+      return rows.map((row) => {
+        const cells = row.querySelectorAll('td');
+
+        const unit = cells[2].innerText.split(': ')[1];
+        let quantity = null;
+        if (unit === 'kg') {
+          quantity = cells[1].innerText.split(': ')[1];
+        } else {
+          quantity = Number(cells[1].innerText.split(': ')[1]).toFixed(0);
+        }
+        const name = cells[0].getElementsByTagName('h7').item(0)?.textContent?.trim() || '';
+        const value = cells[3].innerText.split(': R$ ')[1];
+        return { name, quantity, unit, value };
+      });
+    });
+
+    await page.waitForSelector('#formPrincipal\\:j_idt74\\:0\\:j_idt82');
+
+    const data = await page.evaluate(() => {
+      const elCompany = document.querySelector('b');
+      const elPayment = document.querySelector('#formPrincipal\\:j_idt74\\:0\\:j_idt82');
+      const elQuantity = document.querySelectorAll('.col-lg-2 strong');
+
+      const quantity = elQuantity[0] ? elQuantity[0].textContent?.trim() : null || '';
+      const value = elQuantity[1] ? elQuantity[1]?.textContent?.trim() : null || '';
+      const company = elCompany?.textContent?.trim() || '';
+      const payment = elPayment?.textContent?.trim().split(' - ')[1].trim() || '';
+      return { company, payment, value, quantity };
+    });
+
+    return { products: items, ...data };
   }
 }
 
-export const xcParagliderService = new XcParagliderService();
+export const nfeParseService = new NfeParseService();
